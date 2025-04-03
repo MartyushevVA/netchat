@@ -1,47 +1,38 @@
 #include <iostream>
-#include <cstring>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
+#include <boost/asio.hpp>
 
-#define PORT 8080
+using boost::asio::ip::tcp;
 
 int main() {
-    int sock = 0;
-    struct sockaddr_in serv_addr;
-    char buffer[1024] = {0};
+    try {
+        boost::asio::io_context io_context;
 
-    // Создание сокета
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        std::cerr << "Ошибка создания сокета\n";
-        return -1;
+        // Создание сокета
+        tcp::socket socket(io_context);
+
+        // Подключение к серверу
+        socket.connect(tcp::endpoint(boost::asio::ip::make_address("127.0.0.1"), 8080));
+
+        std::cout << "Подключено к серверу!\n";
+
+        // Отправка сообщения серверу
+        std::string message = "Привет, сервер!";
+        boost::asio::write(socket, boost::asio::buffer(message));
+
+        // Получение ответа от сервера
+        char buffer[1024] = {0};
+        boost::system::error_code error;
+        size_t length = socket.read_some(boost::asio::buffer(buffer), error);
+
+        if (!error) {
+            std::cout << "Сервер: " << std::string(buffer, length) << "\n";
+        } else {
+            std::cerr << "Ошибка чтения: " << error.message() << "\n";
+        }
+
+    } catch (std::exception& e) {
+        std::cerr << "Ошибка: " << e.what() << "\n";
     }
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-
-    // Преобразование IP-адреса
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
-        std::cerr << "Неверный адрес\n";
-        return -1;
-    }
-
-    // Подключение к серверу
-    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        std::cerr << "Ошибка подключения\n";
-        return -1;
-    }
-
-    // Отправка сообщения серверу
-    const char* message = "Привет, сервер!";
-    send(sock, message, strlen(message), 0);
-
-    // Получение ответа от сервера
-    read(sock, buffer, 1024);
-    std::cout << "Сервер: " << buffer << "\n";
-
-    // Закрытие сокета
-    close(sock);
 
     return 0;
 }
